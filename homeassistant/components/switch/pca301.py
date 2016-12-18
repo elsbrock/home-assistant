@@ -9,18 +9,14 @@ https://home-assistant.io/components/switch.pca301/
 """
 import os
 import re
-import time
-
 import logging
-import threading
-
-import voluptuous as vol
 
 from datetime import datetime
 
+import voluptuous as vol
+
 from homeassistant.components.switch import (SwitchDevice, PLATFORM_SCHEMA)
-from homeassistant.const import (
-    STATE_ON, STATE_OFF, STATE_UNKNOWN, CONF_NAME, CONF_DEVICE, EVENT_HOMEASSISTANT_STOP)
+from homeassistant.const import (CONF_DEVICE, EVENT_HOMEASSISTANT_STOP)
 import homeassistant.helpers.config_validation as cv
 
 REQUIREMENTS = ['pyserial==3.1.1']
@@ -37,7 +33,9 @@ DEFAULT_BAUD = 57600
 DEFAULT_TIMEOUT = 1
 DEFAULT_WRITE_TIMEOUT = 1
 
-OUTLET_STATUS_MSG = re.compile('^OK (?:\d+) (?P<nodeid>\d+) (?:\d+) (?:\d+ \d+ \d+) (?P<state>1|0) (?P<total>\d+ \d+) (?P<current>\d+ \d+)')
+OUTLET_STATUS_MSG = re.compile(
+    r'^OK (?:\d+) (?P<nodeid>\d+) (?:\d+) (?:\d+ \d+ \d+) (?P<state>1|0) ' +
+    r'(?P<total>\d+ \d+) (?P<current>\d+ \d+)')
 
 def isdevice(dev):
     """Check if dev a real device."""
@@ -46,7 +44,6 @@ def isdevice(dev):
         return str(dev)
     except OSError:
         raise vol.Invalid("No device found!")
-
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_DEVICE, default=DEFAULT_DEVICE): isdevice,
@@ -58,11 +55,14 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 })
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
+    """Initialize the PCA301 Controller"""
     serial_port = config.get(CONF_DEVICE)
     baud = config.get(CONF_BAUD)
     timeout = config.get(CONF_TIMEOUT)
     write_timeout = config.get(CONF_WRITE_TIMEOUT)
     mapping = config.get(CONF_MAPPING, {})
+
+    import serial
 
     try:
         ctrl = PCA301Ctrl(serial_port, baud, mapping, timeout, write_timeout, add_devices)
@@ -72,21 +72,28 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         return False
 
     def dispose(event):
+        """Shutdown the PCA301 Controller thread."""
         ctrl.shutdown()
 
     hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, dispose)
 
 class PCA301Ctrl():
+    """The PCA301 controller is responsible for communication with the plugs
+    via serial provided by a Jeelink."""
     def __init__(self, serial_port, baud, mapping, timeout, write_timeout, add_devices, **kwargs):
         devcb = add_devices
         devices = {}
 
-        import serial, serial.threaded
+        import serial
+        import serial.threaded
         serial_device = serial.Serial(
             port=serial_port, baudrate=baud, timeout=timeout, write_timeout=write_timeout,
             **kwargs)
 
         class JeelinkHandler(serial.threaded.LineReader):
+            """The JeelinkHandler parses the output provided by the Jeelink
+            over serial and looks for status updates of plugs. For this it
+            spins up a thread that is used for the serial I/O."""
             def connection_made(self, transport):
                 super(JeelinkHandler, self).connection_made(transport)
                 _LOGGER.debug('port opened\n')
@@ -94,7 +101,7 @@ class PCA301Ctrl():
             def handle_line(self, line):
                 line = line.strip()
                 status_report = OUTLET_STATUS_MSG.match(line)
-                if (status_report):
+                if status_report:
                     _LOGGER.debug(line)
 
                     nodeid = status_report.group('nodeid')
@@ -117,23 +124,25 @@ class PCA301Ctrl():
                     else:
                         _LOGGER.debug("discovered new device with id " + nodeid)
                         name = mapping.get(int(nodeid), 'pca301_node' + str(nodeid))
-                        devices[nodeid] = PCA301Plug(self, name, nodeid, is_on, curr_consumption, total_consumption)
+                        devices[nodeid] = PCA301Plug(
+                            self, name, nodeid, is_on, curr_consumption, total_consumption)
                         devcb([devices[nodeid]])
 
             def write_line(self, data):
-                self.transport.write(data.encode(self.ENCODING, self.UNICODE_HANDLING) + self.TERMINATOR)
+                self.transport.write(data.encode(
+                    self.ENCODING, self.UNICODE_HANDLING) + self.TERMINATOR)
 
             def connection_lost(self, exc):
                 if exc:
                     _LOGGER.debug(exc)
                 _LOGGER.debug('port closed\n')
 
-
         self.thread = serial.threaded.ReaderThread(serial_device, JeelinkHandler)
         self.thread.start()
         _LOGGER.debug("thread started")
 
     def shutdown(self):
+        """Shuts down the serial I/O thread."""
         self.thread.stop()
 
 class PCA301Plug(SwitchDevice):
@@ -152,7 +161,6 @@ class PCA301Plug(SwitchDevice):
 
     @property
     def name(self):
-        """Return the name or location of the plug."""
         return self._name
 
     @property
@@ -161,31 +169,30 @@ class PCA301Plug(SwitchDevice):
 
     @property
     def is_on(self):
-        """Return true if on."""
         return self._state
 
     @property
     def device_state_attributes(self):
-        """Returns the current consumption."""
         return {
             'current_consumption': self._current,
             'total_consumption': self._total,
         }
 
     def set_state(self, state):
+        """Sets the state of the plug (based on a received status update) """
         self._state = state
         self._lastupdate = datetime.utcnow()
         self.schedule_update_ha_state(True)
 
     def turn_on(self):
-        """Set smartplug status on."""
+        """Set plug status to on."""
         _LOGGER.debug('about to turn on plug ' + self._id)
         self._state = True
         self._ctrl.write_line(self._id+'e')
         self.schedule_update_ha_state()
 
     def turn_off(self):
-        """Set smartplug status off."""
+        """Set plug status to off."""
         _LOGGER.debug('about to turn off plug ' + self._id)
         self._state = False
         self._ctrl.write_line(self._id+'d')
