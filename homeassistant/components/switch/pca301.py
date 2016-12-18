@@ -18,7 +18,7 @@ import voluptuous as vol
 
 from homeassistant.components.switch import (SwitchDevice, PLATFORM_SCHEMA)
 from homeassistant.const import (
-    STATE_ON, STATE_OFF, STATE_UNKNOWN, CONF_NAME, CONF_DEVICE)
+    STATE_ON, STATE_OFF, STATE_UNKNOWN, CONF_NAME, CONF_DEVICE, EVENT_HOMEASSISTANT_STOP)
 import homeassistant.helpers.config_validation as cv
 
 REQUIREMENTS = ['pyserial==3.1.1']
@@ -63,11 +63,16 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     mapping = config.get(CONF_MAPPING, {})
 
     try:
-        PCA301Ctrl(serial_port, baud, mapping, timeout, write_timeout, add_devices)
+        ctrl = PCA301Ctrl(serial_port, baud, mapping, timeout, write_timeout, add_devices)
         _LOGGER.debug("PCA301Ctrl started")
     except serial.SerialException as exc:
         _LOGGER.exception("Unable to open serial port for pca301: %s", exc)
         return False
+
+    def dispose(event):
+        ctrl.shutdown()
+
+    hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, dispose)
 
 class PCA301Ctrl():
     def __init__(self, serial_port, baud, mapping, timeout, write_timeout, add_devices, **kwargs):
@@ -125,8 +130,12 @@ class PCA301Ctrl():
                 _LOGGER.debug('port closed\n')
 
 
-        serial.threaded.ReaderThread(serial_device, JeelinkHandler).start()
+        self.thread = serial.threaded.ReaderThread(serial_device, JeelinkHandler)
+        self.thread.start()
         _LOGGER.debug("thread started")
+
+    def shutdown(self):
+        self.thread.stop()
 
 class PCA301Plug(SwitchDevice):
     """Representation of a pca301 plug."""
