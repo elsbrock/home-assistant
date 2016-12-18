@@ -16,6 +16,8 @@ import threading
 
 import voluptuous as vol
 
+from datetime import datetime
+
 from homeassistant.components.switch import (SwitchDevice, PLATFORM_SCHEMA)
 from homeassistant.const import (
     STATE_ON, STATE_OFF, STATE_UNKNOWN, CONF_NAME, CONF_DEVICE, EVENT_HOMEASSISTANT_STOP)
@@ -110,10 +112,7 @@ class PCA301Ctrl():
 
                     # check if current state matches target state
                     if devices.get(nodeid, None):
-                        if devices[nodeid]._state != is_on:
-                            _LOGGER.debug('state mismatch for plug=%d, target=%d, current=%d, trying to fix' % [nodeid, devices[nodeid]._state, is_on])
-                            devices[nodeid]._state = is_on
-                            devices[nodeid].update()
+                        devices[nodeid].set_state(is_on)
                     # check for new device
                     else:
                         _LOGGER.debug("discovered new device with id " + nodeid)
@@ -146,14 +145,19 @@ class PCA301Plug(SwitchDevice):
         self._name = name
         self._id = device_id
         self._state = state
+        self._available = True
+        self._lastupdate = datetime.utcnow()
         self._current = curr_consumption
         self._total = total_consumption
-        self.update()
 
     @property
     def name(self):
         """Return the name or location of the plug."""
         return self._name
+
+    @property
+    def available(self):
+        return self._available
 
     @property
     def is_on(self):
@@ -164,26 +168,31 @@ class PCA301Plug(SwitchDevice):
     def device_state_attributes(self):
         """Returns the current consumption."""
         return {
-            'current consumption': self._current,
-            'total consumption': self._total,
+            'current_consumption': self._current,
+            'total_consumption': self._total,
         }
+
+    def set_state(self, state):
+        self._state = state
+        self._lastupdate = datetime.utcnow()
+        self.schedule_update_ha_state(True)
 
     def turn_on(self):
         """Set smartplug status on."""
         _LOGGER.debug('about to turn on plug ' + self._id)
         self._state = True
-        self.update()
+        self._ctrl.write_line(self._id+'e')
         self.schedule_update_ha_state()
 
     def turn_off(self):
         """Set smartplug status off."""
         _LOGGER.debug('about to turn off plug ' + self._id)
         self._state = False
-        self.update()
+        self._ctrl.write_line(self._id+'d')
         self.schedule_update_ha_state()
 
     def update(self):
-        if self._state:
-            self._ctrl.write_line(self._id+'e')
-        else:
-            self._ctrl.write_line(self._id+'d')
+        diff = (datetime.utcnow() - self._lastupdate).total_seconds()
+        if diff > 30:
+            self._available = False
+            self.schedule_update_ha_state()
