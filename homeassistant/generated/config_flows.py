@@ -90,6 +90,7 @@ FLOWS = {
         "comelit",
         "control4",
         "coolmaster",
+        "cowboy",
         "cpuspeed",
         "crownstone",
         "daikin",

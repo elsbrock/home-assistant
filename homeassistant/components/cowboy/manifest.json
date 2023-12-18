@@ -1,0 +1,17 @@
+{
+  "domain": "cowboy",
+  "name": "Cowboy",
+  "codeowners": [
+    "@elsbrock"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://www.home-assistant.io/integrations/cowboy",
+  "homekit": {},
+  "iot_class": "cloud_polling",
+  "requirements": [
+    "cowboybike==0.0.5"
+  ],
+  "ssdp": [],
+  "zeroconf": []
+}

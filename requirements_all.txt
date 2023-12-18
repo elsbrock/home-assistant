@@ -641,6 +641,9 @@ connect-box==0.2.8
 # homeassistant.components.xiaomi_miio
 construct==2.10.68
 
+# homeassistant.components.cowboy
+cowboybike==0.0.5
+
 # homeassistant.components.utility_meter
 croniter==1.0.6
 
