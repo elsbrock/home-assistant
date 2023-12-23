@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from cowboybike import Cowboy
+from requests import HTTPError
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -13,11 +13,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
+from ._client import CowboyAPIClient
 from .const import CONF_AUTH, CONF_NAME, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# TODO adjust the data schema to the data that you need
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_USERNAME): str,
@@ -29,6 +29,9 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 class CowboyHub:
     """Cowboy Hub that authenticates with the API."""
 
+    cowboy_api = None
+    name = None
+
     def __init__(self) -> None:
         """Initialize."""
         self.auth = None
@@ -36,18 +39,16 @@ class CowboyHub:
     def authenticate(self, username: str, password: str) -> bool:
         """Test if we can authenticate with the host."""
         try:
-            self.cowboy_api = Cowboy.with_auth(username, password)
-        except KeyError:
-            # currently returning KeyError: 'uid' if authentication fails
-            return False
-        except:  # noqa: E722
-            return False
+            self.cowboy_api = CowboyAPIClient()
+            resp = self.cowboy_api.login(username, password)
+            self.name = resp["data"]["bike"]["nickname"]
+        except HTTPError as http_err:
+            if http_err.response.status_code == 401:
+                raise InvalidAuth
+        except Exception as err:
+            _LOGGER.error("Unexpected error: %s", err)
+            raise CannotConnect
         return True
-
-    def getBikeName(self) -> str:
-        """Return the nickname of the bike."""
-        self.cowboy_api.refreshData()
-        return self.cowboy_api.getBike().nickname
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -55,33 +56,16 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
-    # TODO validate the data can be used to set up a connection.
-
-    # If your PyPI package is not built with async, pass your methods
-    # to the executor:
-    # await hass.async_add_executor_job(
-    #     your_validate_func, data[CONF_USERNAME], data[CONF_PASSWORD]
-    # )
-
     hub = CowboyHub()
 
     result = await hass.async_add_executor_job(
         hub.authenticate, data[CONF_USERNAME], data[CONF_PASSWORD]
     )
-
     if not result:
         raise InvalidAuth
 
-    nickname = await hass.async_add_executor_job(hub.getBikeName)
-
-    # If you cannot connect:
-    # throw CannotConnect
-    # If the authentication is wrong:
-    # InvalidAuth
-
-    # Return info that you want to store in the config entry.
     return {
-        f"{CONF_NAME}": nickname,
+        f"{CONF_NAME}": hub.name,
         f"{CONF_AUTH}": hub.auth,
         f"{CONF_USERNAME}": data[CONF_USERNAME],
         f"{CONF_PASSWORD}": data[CONF_PASSWORD],

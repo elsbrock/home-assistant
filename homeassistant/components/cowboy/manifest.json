@@ -9,9 +9,7 @@
   "documentation": "https://www.home-assistant.io/integrations/cowboy",
   "homekit": {},
   "iot_class": "cloud_polling",
-  "requirements": [
-    "cowboybike==0.0.5"
-  ],
+  "requirements": [],
   "ssdp": [],
   "zeroconf": []
 }

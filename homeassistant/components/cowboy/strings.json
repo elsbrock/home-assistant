@@ -28,16 +28,22 @@
       "total_co2_saved": {
         "name": "Saved CO2"
       },
-      "state_of_charge": {
+      "battery_state_of_charge": {
         "name": "Remaining battery"
       },
-      "state_of_charge_internal": {
-        "name": "Remaining battery (internal)"
+      "pcb_battery_state_of_charge": {
+        "name": "Remaining battery (internal PCB)"
       }
     },
     "binary_sensor": {
       "stolen": {
         "name": "Stolen"
+      },
+      "crashed": {
+        "name": "Crashed"
+      },
+      "update_available": {
+        "name": "Update available"
       }
     }
   }

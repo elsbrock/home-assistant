@@ -16,8 +16,8 @@ from homeassistant.const import PERCENTAGE, UnitOfLength, UnitOfMass, UnitOfTime
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_COORDINATOR, DOMAIN
-from .coordinator import _LOGGER, CowboyCoordinatedEntity, CowboyUpdateCoordinator
+from .const import CONF_BIKE_COORDINATOR, DOMAIN
+from .coordinator import CowboyBikeCoordinatedEntity, CowboyBikeUpdateCoordinator
 
 
 @dataclass
@@ -52,15 +52,15 @@ SENSOR_TYPES: tuple[CowboySensorEntityDescription, ...] = (
         icon="mdi:cloud-check",
     ),
     CowboySensorEntityDescription(
-        key="state_of_charge",
-        translation_key="state_of_charge",
+        key="battery_state_of_charge",
+        translation_key="battery_state_of_charge",
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     CowboySensorEntityDescription(
-        key="state_of_charge_internal",
-        translation_key="state_of_charge_internal",
+        key="pcb_battery_state_of_charge",
+        translation_key="pcb_battery_state_of_charge",
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:battery-heart",
@@ -75,20 +75,20 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Cowboy sensor entries."""
-    cowboy_coordinator = hass.data[DOMAIN][config_entry.entry_id][CONF_COORDINATOR]
+    cowboy_coordinator = hass.data[DOMAIN][config_entry.entry_id][CONF_BIKE_COORDINATOR]
     async_add_entities(
         CowboySensor(cowboy_coordinator, description) for description in SENSOR_TYPES
     )
 
 
-class CowboySensor(CowboyCoordinatedEntity, SensorEntity):
+class CowboySensor(CowboyBikeCoordinatedEntity, SensorEntity):
     """Representation of a Cowboy Bike."""
 
     entity_description: CowboySensorEntityDescription
 
     def __init__(
         self,
-        coordinator: CowboyUpdateCoordinator,
+        coordinator: CowboyBikeUpdateCoordinator,
         description: CowboySensorEntityDescription,
     ) -> None:
         """Initialize a Cowboy sensor."""

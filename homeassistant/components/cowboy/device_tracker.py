@@ -1,21 +1,23 @@
+"""Cowboy device tracker."""
+
 from homeassistant.components.device_tracker.config_entry import (
     SourceType,
     TrackerEntity,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     ATTR_ACCURACY,
     ATTR_LATITUDE,
-    ATTR_LOCATION_NAME,
+    ATTR_LOC_NAME,
+    ATTR_LOC_RECEIVED_AT,
     ATTR_LONGITUDE,
-    CONF_COORDINATOR,
+    CONF_BIKE_COORDINATOR,
     DOMAIN,
 )
-from .coordinator import _LOGGER, CowboyCoordinatedEntity, CowboyUpdateCoordinator
+from .coordinator import CowboyBikeCoordinatedEntity, CowboyBikeUpdateCoordinator
 
 
 async def async_setup_entry(
@@ -24,11 +26,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Cowboy sensor entries."""
-    cowboy_coordinator = hass.data[DOMAIN][config_entry.entry_id][CONF_COORDINATOR]
+    cowboy_coordinator = hass.data[DOMAIN][config_entry.entry_id][CONF_BIKE_COORDINATOR]
     async_add_entities([CowboyTracker(cowboy_coordinator)])
 
 
-class CowboyTracker(CowboyCoordinatedEntity, TrackerEntity):
+class CowboyTracker(CowboyBikeCoordinatedEntity, TrackerEntity):
     """Cowboy device tracker."""
 
     _attr_force_update = False
@@ -37,7 +39,7 @@ class CowboyTracker(CowboyCoordinatedEntity, TrackerEntity):
 
     def __init__(
         self,
-        coordinator: CowboyUpdateCoordinator,
+        coordinator: CowboyBikeUpdateCoordinator,
     ) -> None:
         """Initialize the Tracker."""
         super().__init__(coordinator)
@@ -66,7 +68,7 @@ class CowboyTracker(CowboyCoordinatedEntity, TrackerEntity):
     @property
     def location_name(self) -> str | None:
         """Return a location name for the current location of the device."""
-        return self._attr_extra_state_attributes.get(ATTR_LOCATION_NAME, None)
+        return self._attr_extra_state_attributes.get(ATTR_LOC_NAME, None)
 
     @property
     def source_type(self) -> SourceType:
@@ -81,7 +83,8 @@ class CowboyTracker(CowboyCoordinatedEntity, TrackerEntity):
                 ATTR_LATITUDE: self.coordinator.data["position"]["latitude"],
                 ATTR_LONGITUDE: self.coordinator.data["position"]["longitude"],
                 ATTR_ACCURACY: self.coordinator.data["position"]["accuracy"],
-                ATTR_LOCATION_NAME: self.coordinator.data["position"]["address"],
+                ATTR_LOC_NAME: self.coordinator.data["position"]["address"],
+                ATTR_LOC_RECEIVED_AT: self.coordinator.data["position"]["received_at"],
             }
         )
         self.async_write_ha_state()
