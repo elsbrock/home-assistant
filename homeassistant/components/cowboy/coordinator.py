@@ -8,9 +8,14 @@ from cowboybike import Cowboy
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+    UpdateFailed,
+)
 
-from .const import DOMAIN
+from .const import ATTRIBUTION, DOMAIN, MANUFACTURER
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,18 +23,23 @@ _LOGGER = logging.getLogger(__name__)
 class CowboyUpdateCoordinator(DataUpdateCoordinator):
     """Cowboy coordinator to fetch data from the inofficial API at a set interval."""
 
+    config_entry: ConfigEntry
+    device_info: DeviceInfo
+
     def __init__(
         self, hass: HomeAssistant, cowboy_api: Cowboy, config_entry: ConfigEntry
     ) -> None:
         """Initialize the coordinator with the given API client."""
         super().__init__(
-            hass,
-            _LOGGER,
-            name=DOMAIN,
-            update_interval=timedelta(seconds=5),
+            hass, _LOGGER, name=DOMAIN, update_interval=timedelta(seconds=5)
         )
         _LOGGER.info("Initializing CowboyCoordinator")
         self.cowboy_api = cowboy_api
+        self.device_info = DeviceInfo(
+            identifiers={(DOMAIN, self.config_entry.entry_id)},
+            name=self.config_entry.title,
+            manufacturer=MANUFACTURER,
+        )
 
     async def _async_update_data(self) -> dict:
         """Fetch data from API endpoint."""
@@ -53,9 +63,10 @@ class CowboyUpdateCoordinator(DataUpdateCoordinator):
         """Fetch the data from the Cowboy API and return a flat dict with only needed sensor data."""
         self.cowboy_api.refreshData()
         bike = self.cowboy_api.getBike()
+        self.device_info["sw_version"] = bike.firmware_version
         # dump bike object as JSON
         _LOGGER.info(vars(bike))
-        return {"BIKE": bike}
+        return vars(bike)
 
     @callback
     def _update_auth_token(self):
@@ -68,3 +79,18 @@ class CowboyUpdateCoordinator(DataUpdateCoordinator):
         #     # Update the config entry
         #     self.hass.config_entries.async_update_entry(self.config_entry, data=data)
         pass
+
+
+class CowboyCoordinatedEntity(CoordinatorEntity[CowboyUpdateCoordinator]):
+    """Defines a base Cowboy entity."""
+
+    _attr_attribution = ATTRIBUTION
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: CowboyUpdateCoordinator,
+    ) -> None:
+        """Initialize the coordinated Cowboy Device."""
+        CoordinatorEntity.__init__(self, coordinator=coordinator)
+        self._attr_device_info = coordinator.device_info

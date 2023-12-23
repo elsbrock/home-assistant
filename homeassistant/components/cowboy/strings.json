@@ -16,5 +16,29 @@
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
+  },
+  "entity": {
+    "sensor": {
+      "total_distance": {
+        "name": "Mileage"
+      },
+      "total_duration": {
+        "name": "Time driven"
+      },
+      "total_co2_saved": {
+        "name": "Saved CO2"
+      },
+      "state_of_charge": {
+        "name": "Remaining battery"
+      },
+      "state_of_charge_internal": {
+        "name": "Remaining battery (internal)"
+      }
+    },
+    "binary_sensor": {
+      "stolen": {
+        "name": "Stolen"
+      }
+    }
   }
 }

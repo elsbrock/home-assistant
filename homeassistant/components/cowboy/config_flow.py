@@ -5,7 +5,6 @@ import logging
 from typing import Any
 
 from cowboybike import Cowboy
-
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -14,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN
+from .const import CONF_AUTH, CONF_NAME, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,10 +81,10 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     # Return info that you want to store in the config entry.
     return {
-        "title": nickname,
-        "auth": hub.auth,
-        "username": data[CONF_USERNAME],
-        "password": data[CONF_PASSWORD],
+        f"{CONF_NAME}": nickname,
+        f"{CONF_AUTH}": hub.auth,
+        f"{CONF_USERNAME}": data[CONF_USERNAME],
+        f"{CONF_PASSWORD}": data[CONF_PASSWORD],
     }
 
 
@@ -110,8 +109,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
-                await self.async_set_unique_id(info["title"])
-                return self.async_create_entry(title=info["title"], data=user_input)
+                await self.async_set_unique_id(info[CONF_NAME])
+                return self.async_create_entry(title=info[CONF_NAME], data=info)
 
         return self.async_show_form(
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
