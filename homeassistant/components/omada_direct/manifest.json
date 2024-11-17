@@ -1,0 +1,15 @@
+{
+  "domain": "omada_direct",
+  "name": "Omada EAP",
+  "codeowners": [
+    "@elsbrock"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://www.home-assistant.io/integrations/omada_direct",
+  "homekit": {},
+  "iot_class": "local_polling",
+  "requirements": [],
+  "ssdp": [],
+  "zeroconf": []
+}
