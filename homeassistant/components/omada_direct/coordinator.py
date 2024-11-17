@@ -1,9 +1,13 @@
 from datetime import timedelta
 import logging
+from typing import List
+
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
 from .client import OmadaClient
 
 _LOGGER = logging.getLogger(__name__)
+
 
 class OmadaClientUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Omada data."""
@@ -18,20 +22,25 @@ class OmadaClientUpdateCoordinator(DataUpdateCoordinator):
         )
         self.client = client
         self.access_point_mac = access_point_mac
-        self.clients_info = []
+        self.clients_info = List[any]
 
     async def _async_update_data(self):
         """Fetch data from Omada controller."""
         try:
-            await self.client.ensure_authenticated()
+            print("Updating data...")
 
-            # Fetch clients info
-            clients_response = await self.client.fetch_clients()
-            self.clients_info = clients_response.get('data', [])
+            try:
+                await self.client.connect()
+                await self.client.login()
+                clients_response = await self.client.fetch_clients()
+                self.clients_info = clients_response.get("data", [])
+            finally:
+                await self.client.logout()
+                await self.client.close()
 
             return {
-                'clients': self.clients_info,
-                'access_point_mac': self.access_point_mac,
+                "clients": self.clients_info,
+                "access_point_mac": self.access_point_mac,
             }
 
         except Exception as e:

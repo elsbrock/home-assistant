@@ -2,29 +2,34 @@
 
 import asyncio
 import hashlib
-import aiohttp
-import ssl
 import logging
-from aiohttp import ClientSession, ClientConnectorError
-from typing import Optional
+import ssl
 import types  # Import types module for SimpleNamespace
+from typing import Optional
+
+import aiohttp
+from aiohttp import ClientConnectorError, ClientSession
+
 
 # Define custom exceptions for clarity
 class OmadaClientError(Exception):
     """Base exception for OmadaClient."""
 
+
 class LoginError(OmadaClientError):
     """Raised when login fails due to invalid credentials or other issues."""
+
 
 class FetchDataError(OmadaClientError):
     """Raised when fetching data fails."""
 
+
 class LogoutError(OmadaClientError):
     """Raised when logout fails."""
 
+
 class OmadaClient:
-    """
-    A minimal asynchronous client library for TP-Link Omada EAP.
+    """A minimal asynchronous client library for TP-Link Omada EAP.
 
     Attributes:
         host (str): The base URL of the Omada EAP (e.g., 'https://10.42.99.62').
@@ -40,10 +45,9 @@ class OmadaClient:
         username: str,
         password: str,
         ssl_verify: bool = False,
-        logger: Optional[logging.Logger] = None
+        logger: Optional[logging.Logger] = None,
     ):
-        """
-        Initializes the OmadaClient.
+        """Initializes the OmadaClient.
 
         Args:
             host (str): Base URL of the Omada EAP.
@@ -52,7 +56,7 @@ class OmadaClient:
             ssl_verify (bool, optional): Whether to verify SSL certificates. Defaults to False.
             logger (logging.Logger, optional): Custom logger. If None, a default logger is created.
         """
-        self.host = host.rstrip('/')
+        self.host = host.rstrip("/")
         self.username = username
         self.password = password
         self.ssl_verify = ssl_verify
@@ -61,9 +65,7 @@ class OmadaClient:
         if logger is None:
             self.logger = logging.getLogger(__name__)
             handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                '%(asctime)s [%(levelname)s] %(message)s'
-            )
+            formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.INFO)
@@ -84,9 +86,7 @@ class OmadaClient:
         await self.close()
 
     async def connect(self):
-        """
-        Establishes an aiohttp ClientSession with appropriate configurations.
-        """
+        """Establishes an aiohttp ClientSession with appropriate configurations."""
         self.logger.debug("Establishing HTTP session with Omada EAP.")
 
         # Create SSL context
@@ -111,7 +111,7 @@ class OmadaClient:
                 headers=self._default_headers(),
                 cookie_jar=jar,
                 connector=aiohttp.TCPConnector(ssl=ssl_context),
-                trace_configs=[trace_config]
+                trace_configs=[trace_config],
             )
             self.logger.debug("HTTP session established successfully.")
         except Exception as e:
@@ -119,27 +119,24 @@ class OmadaClient:
             raise OmadaClientError(f"Failed to establish HTTP session: {e}") from e
 
     async def close(self):
-        """
-        Closes the aiohttp ClientSession.
-        """
+        """Closes the aiohttp ClientSession."""
         if self.session and not self.session.closed:
             await self.session.close()
             self.logger.debug("HTTP session closed.")
 
     def _default_headers(self) -> dict:
-        """
-        Returns the default headers for HTTP requests.
+        """Returns the default headers for HTTP requests.
 
         Returns:
             dict: Default HTTP headers.
         """
         return {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0',
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Origin': self.host,
-            'Referer': f"{self.host}/logout.html",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            "Origin": self.host,
+            "Referer": f"{self.host}/logout.html",
         }
 
     # Trace callback methods for detailed logging
@@ -148,12 +145,15 @@ class OmadaClient:
         self.logger.debug(f"Method: {params.method}")
         self.logger.debug(f"URL: {params.url}")
         self.logger.debug(f"Headers: {dict(params.headers)}")
-        if params.method.upper() in ['POST', 'PUT', 'PATCH']:
+        if params.method.upper() in ["POST", "PUT", "PATCH"]:
             # Access the request body from trace_config_ctx
-            data = getattr(trace_config_ctx, 'data', None)
+            data = getattr(trace_config_ctx, "data", None)
             if data:
                 # Mask sensitive information
-                masked_data = {k: ('****' if k.lower() == 'password' else v) for k, v in data.items()}
+                masked_data = {
+                    k: ("****" if k.lower() == "password" else v)
+                    for k, v in data.items()
+                }
                 self.logger.debug(f"Request Body: {masked_data}")
 
     async def _on_request_end(self, session, trace_config_ctx, params):
@@ -167,8 +167,7 @@ class OmadaClient:
         pass
 
     async def login(self):
-        """
-        Logs into the Omada EAP.
+        """Logs into the Omada EAP.
 
         Raises:
             LoginError: If login fails due to invalid credentials or other issues.
@@ -176,8 +175,7 @@ class OmadaClient:
         await self.ensure_authenticated()
 
     async def ensure_authenticated(self):
-        """
-        Ensures that the client is authenticated. Logs in if not already authenticated.
+        """Ensures that the client is authenticated. Logs in if not already authenticated.
 
         Raises:
             LoginError: If login fails or JSESSIONID cookie is missing/invalid.
@@ -192,8 +190,8 @@ class OmadaClient:
 
         login_url = f"{self.host}/"
         payload = {
-            'username': self.username,
-            'password': hashlib.md5(self.password.encode()).hexdigest().upper()
+            "username": self.username,
+            "password": hashlib.md5(self.password.encode()).hexdigest().upper(),
         }
 
         try:
@@ -201,27 +199,40 @@ class OmadaClient:
             async with self.session.post(
                 login_url,
                 data=payload,
-                trace_request_ctx=types.SimpleNamespace(data=payload)
+                trace_request_ctx=types.SimpleNamespace(data=payload),
             ) as resp:
                 if resp.status == 200:
                     text = await resp.text()
-                    if 'success' in text.lower() or resp.headers.get('Content-Length') == '0':
+                    if (
+                        "success" in text.lower()
+                        or resp.headers.get("Content-Length") == "0"
+                    ):
                         # Retrieve cookies associated with the login URL
                         cookies = self.session.cookie_jar.filter_cookies(login_url)
-                        jsessionid_cookie = cookies.get('JSESSIONID')
+                        jsessionid_cookie = cookies.get("JSESSIONID")
 
                         if jsessionid_cookie and jsessionid_cookie.value:
                             self.logged_in = True
-                            self.logger.info("Login successful. JSESSIONID cookie is present and valid.")
+                            self.logger.info(
+                                "Login successful. JSESSIONID cookie is present and valid."
+                            )
                         else:
-                            self.logger.error("Login failed: JSESSIONID cookie missing or invalid.")
-                            raise LoginError("Login failed: JSESSIONID cookie missing or invalid.")
+                            self.logger.error(
+                                "Login failed: JSESSIONID cookie missing or invalid."
+                            )
+                            raise LoginError(
+                                "Login failed: JSESSIONID cookie missing or invalid."
+                            )
                     else:
                         self.logger.error("Login failed: Unexpected response content.")
                         raise LoginError("Login failed: Unexpected response content.")
                 elif resp.status == 401:
-                    self.logger.error("Login failed: Unauthorized (401). Check your credentials.")
-                    raise LoginError("Login failed: Unauthorized (401). Check your credentials.")
+                    self.logger.error(
+                        "Login failed: Unauthorized (401). Check your credentials."
+                    )
+                    raise LoginError(
+                        "Login failed: Unauthorized (401). Check your credentials."
+                    )
                 else:
                     self.logger.error(f"Login failed with status code {resp.status}.")
                     raise LoginError(f"Login failed with status code {resp.status}.")
@@ -235,10 +246,8 @@ class OmadaClient:
             self.logger.error(f"An unexpected error occurred during login: {e}")
             raise LoginError(f"An unexpected error occurred during login: {e}") from e
 
-
     async def fetch_clients(self) -> dict:
-        """
-        Fetches data from the Omada EAP.
+        """Fetches data from the Omada EAP.
 
         Args:
             operation (str, optional): Operation type. Defaults to 'load'.
@@ -256,9 +265,7 @@ class OmadaClient:
             raise FetchDataError(f"Authentication failed: {e}") from e
 
         data_url = f"{self.host}/data/status.client.user.json"
-        params = {
-            'operation': 'load'
-        }
+        params = {"operation": "load"}
 
         try:
             self.logger.info("Fetching data from Omada EAP.")
@@ -271,12 +278,18 @@ class OmadaClient:
                         return data
                     except Exception as e:
                         self.logger.error(f"Failed to parse JSON response: {e}")
-                        raise FetchDataError(f"Failed to parse JSON response: {e}") from e
+                        raise FetchDataError(
+                            f"Failed to parse JSON response: {e}"
+                        ) from e
                 else:
-                    self.logger.error(f"Failed to fetch data with status code {resp.status}.")
+                    self.logger.error(
+                        f"Failed to fetch data with status code {resp.status}."
+                    )
                     body = await resp.text()
                     self.logger.debug(f"Response Body: {body}")
-                    raise FetchDataError(f"Failed to fetch data with status code {resp.status}.")
+                    raise FetchDataError(
+                        f"Failed to fetch data with status code {resp.status}."
+                    )
         except ClientConnectorError as e:
             self.logger.error(f"Connection error while fetching data: {e}")
             raise FetchDataError(f"Connection error while fetching data: {e}") from e
@@ -285,11 +298,12 @@ class OmadaClient:
             raise FetchDataError("Data fetch request timed out.")
         except Exception as e:
             self.logger.error(f"An unexpected error occurred while fetching data: {e}")
-            raise FetchDataError(f"An unexpected error occurred while fetching data: {e}") from e
+            raise FetchDataError(
+                f"An unexpected error occurred while fetching data: {e}"
+            ) from e
 
     async def fetch_device_info(self) -> dict:
-        """
-        Fetches device information from the Omada EAP.
+        """Fetches device information from the Omada EAP.
 
         Returns:
             dict: Parsed JSON data from the response.
@@ -298,9 +312,7 @@ class OmadaClient:
             FetchDataError: If fetching device info fails.
         """
         device_info_url = f"{self.host}/data/status.device.json"
-        params = {
-            'operation': 'read'
-        }
+        params = {"operation": "read"}
 
         try:
             self.logger.info("Fetching device information from Omada EAP.")
@@ -310,17 +322,22 @@ class OmadaClient:
                     self.logger.debug(f"Device Info Data: {data}")
                     return data
                 else:
-                    self.logger.error(f"Failed to fetch device info with status code {resp.status}.")
+                    self.logger.error(
+                        f"Failed to fetch device info with status code {resp.status}."
+                    )
                     body = await resp.text()
                     self.logger.debug(f"Response Body: {body}")
-                    raise FetchDataError(f"Failed to fetch device info with status code {resp.status}.")
+                    raise FetchDataError(
+                        f"Failed to fetch device info with status code {resp.status}."
+                    )
         except Exception as e:
             self.logger.error(f"An error occurred while fetching device info: {e}")
-            raise FetchDataError(f"An error occurred while fetching device info: {e}") from e
+            raise FetchDataError(
+                f"An error occurred while fetching device info: {e}"
+            ) from e
 
     async def logout(self):
-        """
-        Logs out from the Omada EAP.
+        """Logs out from the Omada EAP.
 
         Raises:
             LogoutError: If logout fails.

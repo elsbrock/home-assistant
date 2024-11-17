@@ -14,8 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
+from .client import FetchDataError, LoginError, OmadaClient  # Correct import
 from .const import DOMAIN
-from .client import OmadaClient, LoginError, FetchDataError, LogoutError  # Correct import
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_PASSWORD): str,
     }
 )
+
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect.
@@ -48,13 +49,15 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         username=username,
         password=password,
         ssl_verify=False,  # Adjust if you have SSL verification
-        logger=_LOGGER  # Use Home Assistant's logger
+        logger=_LOGGER,  # Use Home Assistant's logger
     )
 
     try:
         await temp_client.connect()  # Establish the HTTP session
-        await temp_client.login()    # Attempt to log in
-
+        await temp_client.login()  # Attempt to log in
+        access_point_response = await temp_client.fetch_device_info()
+        access_point_info = access_point_response.get("data", {})
+        device_name = access_point_info.get("deviceName", "Unknown")
     except LoginError as e:
         _LOGGER.error(f"Login failed: {e}")
         raise InvalidAuth from e
@@ -68,13 +71,16 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         await temp_client.close()  # Ensure the temporary session is closed
 
     # If login is successful, return a title for the config entry
-    return {"title": host}
+    return {"title": device_name}
+
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Omada EAP."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL  # Adjust based on your integration's connection type
+    CONNECTION_CLASS = (
+        config_entries.CONN_CLASS_LOCAL_POLL
+    )  # Adjust based on your integration's connection type
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -100,8 +106,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
         )
 
+
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""
+
 
 class InvalidAuth(HomeAssistantError):
     """Error to indicate there is invalid auth."""

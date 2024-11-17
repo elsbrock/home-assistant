@@ -1,9 +1,7 @@
 {
   "domain": "omada_direct",
   "name": "Omada EAP",
-  "codeowners": [
-    "@elsbrock"
-  ],
+  "codeowners": ["@elsbrock"],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://www.home-assistant.io/integrations/omada_direct",
